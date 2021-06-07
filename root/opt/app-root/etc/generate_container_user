@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# =======================================
+# AUTHOR        : Claudio Prato
+# CREATE DATE   : 2021/04/14
+# PURPOSE       : Set current user choosing between either the nss_wrapper or file direct change
+# SPECIAL NOTES :
+# =======================================
+#
+# set -o errexit
+# set -o pipefail
+# set -o nounset
+# set -o xtrace
+#
+# it follows the command to verify if it works
+# python -c "import os, pwd; print pwd.getpwuid(os.getuid());"
+
+USER_ID=$(id -u)
+GROUP_ID=$(id -g)
+
+if [ x"${USER_ID}" != x"0" -a x"${USER_ID}" != x"1001" ]; then
+
+  if [[ "${NSS_WRAPPER_FLAG:-false}" == "true" ]]; then
+    
+    NSS_WRAPPER_PASSWD=/opt/app-root/etc/passwd
+    NSS_WRAPPER_GROUP=/etc/group
+
+    cat /etc/passwd | sed -e 's/^default:/builder:/' > ${NSS_WRAPPER_PASSWD}
+    echo "default:x:${USER_ID}:${GROUP_ID}:Default Application User:${HOME}:/sbin/nologin" >> ${NSS_WRAPPER_PASSWD}
+
+    export NSS_WRAPPER_PASSWD
+    export NSS_WRAPPER_GROUP
+    export LD_PRELOAD=libnss_wrapper.so
+    
+  else
+    
+    TEMPFILE=`mktemp --tmpdir temp.XXXXX`
+    
+    # when the POD restarts it deletes the previous default user
+    # when the POD restarts it renames from default to builder user
+    [[ -z $(awk '/builder:/' /etc/passwd) ]] && cat /etc/passwd | sed -e 's/^default:/builder:/' > ${TEMPFILE} || cat /etc/passwd | sed -e '/^default:/d' > ${TEMPFILE}
+    # add the new anyuid user
+    echo "default:x:${USER_ID}:${GROUP_ID}:Default Application User:${HOME}:/sbin/nologin" >> ${TEMPFILE}
+    cat ${TEMPFILE} > /etc/passwd
+    rm -rf ${TEMPFILE}
+    
+  fi
+  
+fi

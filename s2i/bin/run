@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#
+# =======================================
+# AUTHOR        : Claudio Prato
+# CREATE DATE   : 03/06/2021
+# PURPOSE       : S2I Build of Dockerfile
+# SPECIAL NOTES :
+# =======================================
+#
+set -o errexit
+set -o pipefail
+# set -o nounset
+# set -o xtrace
+
+if [ -e "/opt/app-root/etc/generate_container_user" ]; then
+  source /opt/app-root/etc/generate_container_user
+fi
+
+exec /usr/local/bin/s2i "$@"
